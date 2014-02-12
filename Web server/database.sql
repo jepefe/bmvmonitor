@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS `bmv` (
+  `date` datetime NOT NULL,
+  `V` float NOT NULL,
+  `VS` float NOT NULL,
+  `I` float NOT NULL,
+  `CE` float NOT NULL,
+  `SOC` float NOT NULL,
+  `TTG` int(11) NOT NULL,
+  `ALARM` tinytext NOT NULL,
+  `RELAY` tinytext NOT NULL,
+  `AR` float NOT NULL,
+  PRIMARY KEY (`date`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `bmv_hist` (
+  `date` date NOT NULL,
+  `max_soc` float NOT NULL,
+  `min_soc` float NOT NULL,
+  `max_v` float NOT NULL,
+  `min_v` float NOT NULL,
+  `max_i` float NOT NULL,
+  `min_i` float NOT NULL,
+  `max_ce` float NOT NULL,
+  `H1` float NOT NULL,
+  `H2` float NOT NULL,
+  `H3` float NOT NULL,
+  `H4` float NOT NULL,
+  `H5` float NOT NULL,
+  `H6` float NOT NULL DEFAULT '0',
+  `H7` float NOT NULL,
+  `H8` float NOT NULL,
+  `H9` float NOT NULL,
+  `H10` float NOT NULL,
+  `H11` float NOT NULL,
+  `H12` float NOT NULL,
+  `H13` float NOT NULL,
+  `H14` float NOT NULL,
+  `H15` float NOT NULL,
+  `H16` float NOT NULL,
+  PRIMARY KEY (`date`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;

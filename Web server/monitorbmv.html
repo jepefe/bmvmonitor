@@ -1,0 +1,911 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-15">
+<link href="./css/monitorsolar.css" type="text/css" rel="stylesheet">
+<!--[if lte IE 8]><script language="javascript" type="text/javascript" src="flot/excanvas.min.js"></script><![endif]-->
+<script language="javascript" type="text/javascript" src="./js/jquery-1.7.1.js"></script>
+<script language="javascript" type="text/javascript" src="./flot/jquery.flot.js"></script>
+<link type="text/css" href="./css/jquery-ui.css" rel="stylesheet"/>
+</head>
+<body>
+<div id="solar">
+	<div id="generacionactual">
+		<div id="datosgeneracionactual">
+			<div id="titulogeneracion" class="titulodisplay">
+				 Status 
+			</div>
+			<div id="ahora">
+				<span class="spanlbl">Amps: </span>
+				<span class="spanval" id="valamp"></span><br/>
+				<span class="spanlbl">Battery: </span>
+				<span class="spanval" id="valvoltbat"></span><br/>
+				<span class="spanlbl">SOC: </span>
+				<span class="spanval" id="valSOC"></span><br/>
+				<span class="spanlbl">CE: </span>
+				<span class="spanval" id="valCE"></span><br/>
+				<span class="spanlbl">TTG: </span>
+				<span class="spanval" id="valTTG"></span><br/>
+				<span class="spanlbl">Relay: </span>
+				<span class="spanval" id="valRELAY"></span><br/>
+				<span class="spanlbl">Alarm: </span>
+				<span class="spanval" id="valALARM"></span><br/>
+				
+			<div class="graficaTR" id="graficaTRA"></div>
+			</div>
+
+			<div id="titulohistorial" class="titulodisplay">
+				 Summary
+			</div>
+			<div id="divhistorial">
+				<span class="spanlbl">Max SOC: </span>
+				<span class="spanval" id="valmaxSOC"></span><br/>
+				<span class="spanlbl">Min SOC: </span>
+				<span class="spanval" id="valminSOC"></span><br/>
+				<span class="spanlbl">Max volt: </span>
+				<span class="spanval" id="valmaxV"></span><br/>
+				<span class="spanlbl">Min volt: </span>
+				<span class="spanval" id="valminV"></span><br/>
+				<span class="spanlbl">Max amps: </span>
+				<span class="spanval" id="valmaxamps"></span><br/>
+				<span class="spanlbl">Min amps: </span>
+				<span class="spanval" id="valminamps"></span><br/>
+
+				<span class="spanlbl">Date: </span>
+				<span class="spanval" id="valfhistor"></span><br/>
+			</div>
+		</div>
+		<div id="graficast">
+			<div id="graficaresumenanyos">
+			</div>
+			<div id="graficaresumenmes">
+			</div>
+			<div id="graficaresumendias">
+			</div>
+		</div>
+	</div>
+	<div id="graficadiaria">
+	</div>
+	<div id="graficascarga">
+		<div id="graficadiariav">
+
+		</div>
+		<div id="graficadiariaSOC">
+
+				</div>
+	</div>
+</div>
+<script type="text/javascript">  
+/*
+Copyright (C) 2011 Jesus Perez <jepefe@gmail.com>
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+ 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License at <http://www.gnu.org/licenses/>
+for more details.
+*/
+
+		function diasmes(Year, Month) //Averiguamos los dias que tiene determinado mes en determinado anyo
+		{
+			return (new Date((new Date(Year, Month+1,1))-1)).getDate();
+		} 
+
+
+		var arraymeses = new Array("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic");
+		var bmvmonthdataset;
+		var bmvdaysdataset;
+		var ahora = Math.round(new Date().getTime()/1000);
+		var primerdiames;
+		var ultimodiames;
+		var bmvdataset;
+		var bmvdatasetI;
+		var bmvdatasetV;
+		var bmvdatasetCE = new Array();
+		var datasetTRA = new Array();
+		var datasetTRV = new Array();
+		var datasetTRSOC = new Array();
+		var lastbmvlog;
+		var max_amp = 0;
+		var max_v = 0;
+		var min_v = 0;
+
+
+
+		//Cargamos todo anyos de los que existen registros
+		cargalistaanyos();
+		//Cargamos los meses de este anyo
+		cargaanyos(ahora); 
+		//Cargamos los dias de este mes
+		cargameses(ahora);
+		//Cargamos los datos registrados hoy
+		cargadia(ahora);
+
+
+		//Cargamos las opciones que utiliza Flot para configurar las graficas
+		function cargaopciones(opcion){ 
+			switch(opcion){
+			case 1:
+				options = {
+		legend: {position: "nw"},
+		lines: { show: true,clickable:true,hoverable: true},
+		points: { show: true, clickable:true, hoverable: true},
+		xaxis: { tickDecimals: 1,minTickSize: [1, "hour"], mode: "time", timeformat: "%h:%M",clickable:true,hoverable: true},
+		grid: { hoverable: true, clickable: true } 
+				};
+				
+				
+				break;
+			case 2:	
+				options9 = {
+		legend: {position: "nw", backgroundOpacity: 0},
+		points: { show: true, clickable:true, hoverable: true},
+		xaxis: { tickDecimals: 1,minTickSize: [1, "hour"], mode: "time", timeformat: "%h:%M",clickable:true,hoverable: true},
+		grid: { hoverable: true, clickable: true }
+				};
+				
+				
+				break;
+			case 3:	
+				
+				options2 = {	
+		bars: { show: true,clickable:true, barWidth : 60*60*1000*24, align : "left" },
+		legend: {backgroundOpacity: 0},
+		xaxis: {tickSize: [4,"day"],
+		mode: "time", timeformat: "%d/%m/%y", 
+		min: primerdiames, 
+		max: ultimodiames,
+		clickable:true, hoverable: true},
+
+		grid: { hoverable: true, clickable: true }
+				};	
+				break;
+			case 4:		
+				options3 = {
+		legend: {position: "nw"},
+		lines: { show: true,clickable:true,hoverable: true},
+		points: { show: true, clickable:true, hoverable: true},
+		xaxis: { tickDecimals: 1,minTickSize: [1, "hour"], mode: "time", timeformat: "%h:%M",clickable:true,hoverable: true},
+		grid: { hoverable: true, clickable: true } 
+
+				};
+				
+				break;
+				
+			case 5:
+				
+				options4 = {	
+		bars: { show: true,clickable:true, barWidth : 60*60*1000*24*30 }, //Necesario para que las barras tengan el ancho adecuado
+		xaxis: {minTickSize: [1,"month"],
+		monthNames: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+		mode: "time", timeformat: "%b", 
+		min: ((new Date((new Date(bmvmonthdataset[0][0])).getFullYear(),0,1))),
+		max: ((new Date((new Date(bmvmonthdataset[0][0])).getFullYear(),11,31))),
+		clickable:true, hoverable: true},
+
+		grid: { hoverable: true, clickable: true }
+				};	
+				
+				
+				break;
+			case 6:									
+				
+				options5 = {	
+		bars: { show: true,clickable:true, barWidth : 60*60*1000*24*365, align : "left" }, //Necesario para que las barras tengan el ancho adecuado
+		xaxis: {minTickSize: [1,"year"],
+		mode: "time", timeformat: "%y", 
+		min: dataset6[0][0],
+		max: (new Date(((new Date()).getFullYear()+5),11,31)),
+
+		clickable:true, hoverable: true},
+
+		grid: { hoverable: true, clickable: true }
+				};	
+				
+				
+				
+			}
+		}
+
+
+
+		//Creamos el tooltip que se mostrara al pasar el raton por encima de las graficas
+
+		function showTooltip(x, y, contents) {
+			$('<div id="tooltip">' + contents + '</div>').css( {
+			position: 'absolute',
+			display: 'none',
+			top: y - 10,
+			left: x + 10,
+			border: '1px solid #fdd',
+			padding: '2px',
+					'background-color': '#fee',
+			opacity: 0.80
+			}).appendTo("body").fadeIn(200);
+		}
+
+
+		var previousPoint = null;
+		//Atendemos a los eventos que se producen al hacer click y pasar el raton sobre la grafica de Amperios
+
+
+
+
+		//Atendemos a los eventos que se producen al hacer click y pasar el raton sobre la grafica de Voltios(bateria)
+
+
+
+		$("#graficadiariaSOC").bind("plothover", function (event, pos, item) {
+       $("#x").text(pos.x.toFixed(2));
+        $("#y").text(pos.y.toFixed(2));
+
+               if (item) {
+                if (previousPoint != item.dataIndex) {
+                    previousPoint = item.dataIndex;
+                    
+                    $("#tooltip").remove();
+                   	    var hora=new Date(item.datapoint[0]).getUTCHours();
+		     var minuto=new Date(item.datapoint[0]).getMinutes();
+		    if(minuto<10){
+			minuto= "0"+minuto;
+		    }
+
+                    var x = hora +":"+ minuto;
+                        y = item.datapoint[1].toFixed(2);
+                     etiq=" "
+					if(item.series.label == "SoC"){
+					etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "% " + " a las "  + x +  " -->  <b>"+bmvdatasetCE[item.dataIndex][1]+"Ah</b> ");
+
+                    }else{
+                    		etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "Ah " + " a las "  + x + etiq);
+
+                    }
+                }
+               
+            }
+            else {
+                $("#tooltip").remove();
+                previousPoint = null;            
+            }
+        
+    
+
+    $("#graficadiariaSOC").bind("plotclick", function (event, pos, item) {
+        if (item) {
+		   $.ajax({
+     async: false,
+     type: 'GET',
+     dataType: 'json',
+     url: 'monitorjson.php?detalle='+(item.datapoint[0]/1000),
+	 
+     success: function(data) {
+	
+	    dialogodetalle(data);
+
+    
+  
+          //callback
+     }
+
+});            plot.highlight(item.series, item.datapoint);
+        }
+    });
+});
+
+
+
+$("#graficaTRA").bind("plothover", function (event, pos, item) {
+       $("#x").text(pos.x.toFixed(2));
+        $("#y").text(pos.y.toFixed(2));
+
+               if (item) {
+                if (previousPoint != item.dataIndex) {
+                    previousPoint = item.dataIndex;
+                    
+                    $("#tooltip").remove();
+                   	    var hora=new Date(item.datapoint[0]).getUTCHours();
+		     var minuto=new Date(item.datapoint[0]).getMinutes();
+		     var segundo=new Date(item.datapoint[0]).getSeconds();
+
+
+		    if(minuto<10){
+			minuto= "0"+minuto;
+		    }
+		    if(segundo<10){
+			segundo= "0"+segundo;
+		    }
+
+                    var x = hora +":"+ minuto+":"+segundo;
+                        y = item.datapoint[1].toFixed(2);
+                     etiq=" "
+					if(item.series.label == "V"){
+					etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "V" + " a las "  + x);
+                    }else{
+                    		etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "A " + " a las "  + x + etiq);
+
+                    }
+                }
+               
+            }
+            else {
+                $("#tooltip").remove();
+                previousPoint = null;            
+            }
+        });
+
+
+
+
+ $("#graficadiaria").bind("plothover", function (event, pos, item) {
+       $("#x").text(pos.x.toFixed(2));
+        $("#y").text(pos.y.toFixed(2));
+
+               if (item) {
+                if (previousPoint != item.dataIndex) {
+                    previousPoint = item.dataIndex;
+                    
+                    $("#tooltip").remove();
+                   	    var hora=new Date(item.datapoint[0]).getUTCHours();
+		     var minuto=new Date(item.datapoint[0]).getMinutes();
+		    if(minuto<10){
+			minuto= "0"+minuto;
+		    }
+
+                    var x = hora +":"+ minuto;
+                        y = item.datapoint[1].toFixed(2);
+                     etiq=" "
+					if(item.series.label == "SoC"){
+					etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "% " + " a las "  + x + etiq);
+                    }else{
+                    		etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "A " + " a las "  + x + etiq);
+
+                    }
+                }
+               
+            }
+            else {
+                $("#tooltip").remove();
+                previousPoint = null;            
+            }
+        
+    
+
+    $("#graficadiaria").bind("plotclick", function (event, pos, item) {
+        if (item) {
+		   $.ajax({
+     async: false,
+     type: 'GET',
+     dataType: 'json',
+     url: 'monitorjson.php?detalle='+(item.datapoint[0]/1000),
+	 
+     success: function(data) {
+	
+	    dialogodetalle(data);
+
+    
+  
+          //callback
+     }
+
+});            plot.highlight(item.series, item.datapoint);
+        }
+    });
+});
+
+
+
+
+  $("#graficadiariav").bind("plothover", function (event, pos, item) {
+       $("#x").text(pos.x.toFixed(2));
+        $("#y").text(pos.y.toFixed(2));
+
+               if (item) {
+                if (previousPoint != item.dataIndex) {
+                    previousPoint = item.dataIndex;
+                    
+                    $("#tooltip").remove();
+                   	    var hora=new Date(item.datapoint[0]).getUTCHours();
+		     var minuto=new Date(item.datapoint[0]).getMinutes();
+		    if(minuto<10){
+			minuto= "0"+minuto;
+		    }
+
+                    var x = hora +":"+ minuto;
+                        y = item.datapoint[1].toFixed(2);
+                     etiq=" "
+					if(item.series.label != "V")
+					etiq=" - "+item.series.label;
+                    showTooltip(item.pageX, item.pageY,
+                                y + "V " + " a las "  + x + etiq);
+                }
+            }
+            else {
+                $("#tooltip").remove();
+                previousPoint = null;            
+            }
+        
+    
+
+    $("#graficadiariav").bind("plotclick", function (event, pos, item) {
+        if (item) {
+		   $.ajax({
+     async: false,
+     type: 'GET',
+     dataType: 'json',
+     url: 'monitorjson.php?detalle='+(item.datapoint[0]/1000),
+	 
+     success: function(data) {
+	
+	    dialogodetalle(data);
+
+    
+  
+          //callback
+     }
+
+});            plot.highlight(item.series, item.datapoint);
+        }
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+		//Atendemos a los eventos que se producen al hacer click y pasar el raton sobre la grafica donde se muestran los dias del mes
+
+
+		$("#graficaresumendias").bind("plothover", function (event, pos, item) {
+			$("#x").text(pos.x.toFixed(2));
+			$("#y").text(pos.y.toFixed(2));
+
+			if (item) {
+				if (previousPoint != item.dataIndex) {
+					previousPoint = item.dataIndex;
+					
+					$("#tooltip").remove();
+					var x = (new Date(item.datapoint[0]).getDate()+"-"+(new Date(item.datapoint[0]).getMonth()+1)+"-"+new Date(item.datapoint[0]).getFullYear());
+					y = item.datapoint[1].toFixed(2);
+					
+					showTooltip(item.pageX, item.pageY,
+					y + item.series.label + " el "  + x);
+				}
+			}
+			else {
+				$("#tooltip").remove();
+				previousPoint = null;            
+			}
+			
+		});
+
+		$("#graficaresumendias").bind("plotclick", function (event, pos, item) {
+			if (item) {
+				cargadia((item.datapoint[0]/1000));
+				$("#clickdata").text("You clicked point " + item.dataIndex + " in " + item.series.label + ".");
+				$("#graficaresumendias").highlight(item.series, item.datapoint);
+				
+			}
+		});
+
+		//Atendemos a los eventos que se producen al hacer click y pasar el raton sobre la grafica donde se muestran los meses del anyo
+
+
+		$("#graficaresumenmes").bind("plotclick", function (event, pos, item) {
+			if (item) {
+				cargameses((item.datapoint[0]/1000));
+				$("#clickdata").text("You clicked point " + item.dataIndex + " in " + item.series.label + ".");
+				// $("#graficaresumenmes").highlight(item.series, item.datapoint);
+				
+			}
+		});
+
+		$("#graficaresumenmes").bind("plothover", function (event, pos, item) {
+			$("#x").text(pos.x.toFixed(2));
+			$("#y").text(pos.y.toFixed(2));
+
+			if (item) {
+				if (previousPoint != item.dataIndex) {
+					previousPoint = item.dataIndex;
+					
+					$("#tooltip").remove();
+					var x = arraymeses[(new Date(item.datapoint[0])).getMonth()]+"/"+(new Date(item.datapoint[0]).getFullYear());
+					y = item.datapoint[1].toFixed(2);
+					
+					showTooltip(item.pageX, item.pageY,
+					y + item.series.label + " en "  + x);
+				}
+			}
+			else {
+				$("#tooltip").remove();
+				previousPoint = null;            
+			}
+			
+		});
+
+		//Atendemos a los eventos que se producen al hacer click y pasar el raton sobre la grafica donde se muestran los anyos
+
+		$("#graficaresumenanyos").bind("plotclick", function (event, pos, item) {
+			if (item) {
+				cargaanyos((item.datapoint[0]/1000));
+				highlight(item.series, item.datapoint);
+				$("#clickdata").text("You clicked point " + item.dataIndex + " in " + item.series.label + ".");
+				$("#graficaresumenanyos").highlight(item.series, item.datapoint);
+				
+			}
+		});
+		$("#graficaresumenanyos").bind("plothover", function (event, pos, item) {
+			$("#x").text(pos.x.toFixed(2));
+			$("#y").text(pos.y.toFixed(2));
+
+			if (item) {
+				if (previousPoint != item.dataIndex) {
+					previousPoint = item.dataIndex;
+					
+					$("#tooltip").remove();
+					var x = (new Date(new Date(item.datapoint[0])).getFullYear());
+					y = item.datapoint[1].toFixed(2);
+					
+					showTooltip(item.pageX, item.pageY,
+					y + item.series.label + " en "  + x);
+				}
+			}
+			else {
+				$("#tooltip").remove();
+				previousPoint = null;            
+			}
+			
+		});
+
+
+
+
+
+
+
+
+
+
+		//Cargamos el dia indicado en el argumento
+function cargadia(dia){
+var fecha = new Date(dia*1000);	
+var bmvdatasetA = new Array();
+var bmvdatasetV = new Array();
+//var bmvdatasetCE = new Array();
+var bmvdatasetSOC = new Array();
+cargaopciones(2);
+var data2;
+
+	  $.ajax({
+     async: false,
+     type: 'GET',
+     dataType: 'json',
+     url: './getstatus.php?q=day&date='+fecha.getFullYear()+"-"+(fecha.getMonth()+1)+"-"+fecha.getDate(),
+     success: function(data) {
+
+	
+		   $("#valmaxSOC").text(parseFloat(data['summary'].max_soc).toFixed(1)+"%");
+		   $("#valminSOC").text(parseFloat(data['summary'].min_soc).toFixed(1)+"%");
+			$("#valmaxV").text(parseFloat(data['summary'].max_v).toFixed(3)+" V");
+			$("#valminV").text(parseFloat(data['summary'].min_v).toFixed(3)+" V");
+			$("#valmaxamps").text(parseFloat(data['summary'].max_amps).toFixed(3)+" A");
+			$("#valminamps").text(parseFloat(data['summary'].min_amps).toFixed(3)+" A");
+			$("#valfhistor").text(data['summary'].date);
+}
+});
+
+
+
+
+		 $.ajax({
+     async: false,
+     type: 'GET',
+     dataType: 'json',
+     url: './getstatus.php?q=day&date='+fecha.getFullYear()+"-"+(fecha.getMonth()+1)+"-"+fecha.getDate(),
+     success: function(data1) {
+
+     	bmvdataset = data1['day'];
+         
+
+     	if (bmvdataset != null){
+     	for (i=0;i<bmvdataset.length;i++){
+     		 split_date = bmvdataset[i].date.split(/[- :]/);
+             day_date = (new Date((new Date(split_date[0], split_date[1] - 1, split_date[2], split_date[3], split_date[4]).getTime() - ((new Date().getTimezoneOffset()) * 60000))));
+
+     		bmvdatasetA[i] = new Array( day_date,bmvdataset[i].I);
+     		bmvdatasetV[i] = new Array( day_date,bmvdataset[i].V);
+     		bmvdatasetCE[i] = new Array( day_date,bmvdataset[i].CE);
+     		bmvdatasetSOC[i] = new Array( day_date,bmvdataset[i].SOC);
+
+     		//alert(bmvdataset[i]);
+
+     }
+ }
+		}
+	});
+			
+         
+		 
+		$(function () {
+         $.plot($("#graficadiariaSOC"), [ {label:'SoC', data: bmvdatasetSOC,
+										lines: { show: true,clickable:false,hoverable: true},
+        points: { show: false, clickable:true, hoverable: true},
+        xaxis: { tickDecimals: 1,minTickSize: [1, "hour"], mode: "time", timeformat: "%h:%M",clickable:true,hoverable: true},
+		grid: { hoverable: true, clickable: true },
+		color: "red" }
+									], options9);
+		 
+		   });
+
+		$(function () {
+         $.plot($("#graficadiaria"), [ {label:'A', data: bmvdatasetA,
+										lines: { show: true,clickable:false,hoverable: true},
+        points: { show: false, clickable:true, hoverable: true},
+        xaxis: { tickDecimals: 1,minTickSize: [1, "hour"], mode: "time", timeformat: "%h:%M",clickable:true,hoverable: true},
+		grid: { hoverable: true, clickable: true },
+		color: "blue" }
+									],options9);
+		 
+		   });
+
+		  $(function () {
+		 $.plot($("#graficadiariav"), [ 
+
+										{label:'V', 
+										data: bmvdatasetV,
+										 lines: { show: true,clickable:true,hoverable: true},
+
+										points: { show: false}}
+										
+										
+										],options9);
+        
+		
+		  });
+		
+				
+  
+          //callback
+     
+
+
+
+
+			
+}
+		
+
+		//Cargamos todos los dias del mes indicado en el argumento
+		function cargameses(mes){
+					var fecha = new Date(mes*1000);	
+	
+
+			$.ajax({
+		async: false,
+		type: 'GET',
+		dataType: 'json',
+		url: 'getstatus.php?q=month_days&date='+fecha.getFullYear()+"-"+(fecha.getMonth()+1)+"-"+fecha.getDate(),
+				
+		success: function(data) {
+		bmvdaysdataset=data;
+     	if (bmvdaysdataset != null){
+     	for (i=0;i<bmvdaysdataset.length;i++){
+     		 split_date = bmvdaysdataset[i].fecha.split(/[- :]/);
+
+             month_days_date = (new Date(split_date[0], split_date[1] - 1, split_date[2]))
+     		  bmvdaysdataset[i] = new Array( month_days_date,-bmvdaysdataset[i].ah_out);
+
+
+     }
+ }
+					
+					
+					var fmes = new Date((mes*1000));
+					//Asignamos el primer y ultimo dias del mes seleccionado a las variables de ambito global
+					primerdiames= new Date(fmes.getFullYear(),fmes.getMonth(),1);
+					ultimodiames= new Date(fmes.getFullYear(),fmes.getMonth(),diasmes(fmes.getFullYear(),fmes.getMonth()),23,59);
+					
+					cargaopciones(3);
+					$(function () {
+						$.plot($("#graficaresumendias"), [ {label:'Ah out', data: bmvdaysdataset}],options2);
+						
+					});
+
+
+					//callback
+				}
+
+			});
+
+
+			
+		}
+
+		//Cargamos los meses del anyo que pasamos como argumento
+		function cargaanyos(anyo){
+			var fecha = new Date(anyo*1000);	
+
+
+			$.ajax({
+		async: false,
+		type: 'GET',
+		dataType: 'json',
+		url: 'getstatus.php?q=months&date='+fecha.getFullYear()+"-"+(fecha.getMonth()+1)+"-"+fecha.getDate(),
+		success: function(data) {
+			bmvmonthdataset=data;
+     	if (bmvmonthdataset != null){
+     	for (i=0;i<bmvmonthdataset.length;i++){
+     		 split_date = bmvmonthdataset[i].fecha.split(/[- :]/);
+
+              month_date = (new Date(split_date[0], split_date[1] - 1, 1));
+     		  bmvmonthdataset[i] = new Array( month_date,-bmvmonthdataset[i].ah_out);
+
+     		//alert(bmvdataset[i]);
+
+     }
+ }
+					cargaopciones(5);
+
+					
+					
+					$(function () {
+						
+						$.plot($("#graficaresumenmes"), [ {label:'Ah out', data: bmvmonthdataset}],options4);
+						
+					});
+
+
+					//callback
+				}
+
+			});
+
+
+			
+		}
+
+		//Cargamos todos los anyos existentes
+		function cargalistaanyos(){
+
+
+			$.ajax({
+		async: false,
+		type: 'GET',
+		dataType: 'json',
+		url: 'getstatus.php?q=years',
+		success: function(data) {
+
+			bmvyeardataset=data;
+
+     	if (bmvyeardataset != null){
+     	for (i=0;i<bmvyeardataset.length;i++){
+
+     		 split_date = bmvyeardataset[i].fecha.split(/[- :]/);
+			 year_date = (new Date(split_date[0], 0, 1));
+     		  bmvyeardataset[i] = new Array(year_date,bmvyeardataset[i].ah_out);
+
+     		//alert(bmvdataset[i]);
+
+     }
+ }
+				dataset6=data;
+					cargaopciones(6);
+					$(function () {
+						$.plot($("#graficaresumenanyos"), [ {label:'Ah out', data: bmvyeardataset}],options5);
+						
+					});
+
+
+					//callback
+				}
+
+			});
+
+
+
+			
+		}
+
+
+				function bmvlog(){ //Cada 60 segundo actualizamos los datos de "generacion actual".
+				
+			$.getJSON("bmvlog", function(data){
+				
+				
+				$("#valamp").text(data.I.toFixed(3)+"A");
+				$("#valvoltbat").text(data.V.toFixed(3)+"V");
+				$("#valSOC").text(data.SOC.toFixed(1)+"%");
+				$("#valCE").text(data.CE.toFixed(1)+" Ah");
+				$("#valTTG").text((data.TTG/60).toFixed(1) +"h");
+				$("#valRELAY").text(data.RELAY);	
+				$("#valALARM").text(data.ALARM);
+		
+				if(data != lastbmvlog){
+				if(datasetTRA.length > 0){
+					if(max_amp < data.I){
+						max_amp = data.I;
+					}
+					if(max_v < data.V){
+						max_v = data.V;
+					}
+					if(min_v < data.V){
+						min_v = data.V;
+					}
+					datasetTRA[datasetTRA.length] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.I);
+					datasetTRV[datasetTRV.length] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.V);
+					datasetTRSOC[datasetTRSOC.length] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.SOC);
+
+
+				}else{
+					max_amp = data.I;
+					max_v = data.V;
+					min_v = data.V;
+					datasetTRA[0] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.I);
+					datasetTRV[0] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.V);
+					datasetTRSOC[0] =  new Array((new Date().getTime() - ((new Date().getTimezoneOffset()) * 60000)), data.SOC);
+
+
+				}
+				lastbmvlog=data;
+  		}
+
+			});
+			$(function () {
+         $.plot($("#graficaTRA"), [ {label:'A', data: datasetTRA,
+		lines: { show: true,clickable:false,hoverable: true},
+        points: { show: false, clickable:true, hoverable: true},
+		grid: { hoverable: true, clickable: true },
+	    color: "blue",
+	},                                 {label:'V', 
+										data: datasetTRV,
+										 lines: { show: true,clickable:false,hoverable: true},
+										points: { show: false },
+										yaxis:2}
+
+									],
+									{xaxis: {ticks:false},
+									  yaxis:{/*max: (max_amp+0.1) , */ticks:false},
+           							  y2axis: {/*min:(min_v - 0.1), max:(max_v+0.1),*/tickFormatter: function (v, axis) { return v.toFixed(axis.tickDecimals) }},
+									  grid: { shor:true,hoverable: true, clickable: true },
+									  legend: {position: "nw"}}
+
+
+								);
+		 
+		   });
+
+
+
+
+		}
+
+		bmvlog();
+		setInterval("bmvlog()", 1500);
+
+
+</script>
+
+
+</body>
+
+</html>
