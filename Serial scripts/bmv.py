@@ -112,4 +112,18 @@ class bmv:
                                 if str(values[i]).replace('-','').isdigit():
                                     json[self.valuename[i]] = int(values[i])*self.valuemod[i]
                             else:
-                                #Dont print checksum due to problems with js
+                                #Dont print checksum due to problems with json and UTF
+                                if self.valuename[i] != 'CHECKSM':
+                                    json[self.valuename[i]] = values[i]
+                    
+                        return json
+
+    def get_data(self):
+        
+        return self.read_data()
+
+
+if __name__ == '__main__':
+    bm = bmv("/dev/ttyUSB0",600)
+    print bm.get_data()
+
